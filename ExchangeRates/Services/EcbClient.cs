@@ -1,5 +1,6 @@
 ﻿using ExchangeRates.DTOs;
 using ExchangeRates.Interfaces;
+using ExchangeRates.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -38,7 +39,7 @@ namespace ExchangeRates.Services
         /// Method that requests ecb api for exchange rates of given currencies to euro
         /// </summary>
 		/// <inheritdoc />
-        public async Task<IEnumerable<CurrencyExchange>> RequestApi(
+        public async Task<IEnumerable<EuroExchange>> Get(
             List<string> currencies,
             DateTime dateFrom,
             DateTime dateTo)
@@ -63,7 +64,7 @@ namespace ExchangeRates.Services
         /// </summary>
         /// <param name="source"></param>
         /// <returns>IEnumerable of currency exchanges with euro</returns>
-        private IEnumerable<CurrencyExchange> parseCsvData(string source)
+        private IEnumerable<EuroExchange> parseCsvData(string source)
         {
             var lines = source.Replace("\r", "").Split('\n');
             // check if first line is correct
@@ -84,11 +85,10 @@ namespace ExchangeRates.Services
                         continue;
                     }
 
-                    var currencyExchange = new CurrencyExchange()
+                    var currencyExchange = new EuroExchange()
                     {
                         Date = DateTime.Parse(timePeriod),
-                        CurrencyFrom = currency,
-                        CurrencyTo = "EUR",
+                        Currency = currency,
                         ExchangeRate = Convert.ToDouble(obsValue)
                     };
 
