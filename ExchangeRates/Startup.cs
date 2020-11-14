@@ -26,6 +26,10 @@ namespace ExchangeRates
 
 			services.AddSingleton<IExternalApiClient, EcbClient>();
 
+			services.AddScoped<ICaschingEuroRatesService, InMemCaschingEuroRatesService>();
+
+			services.AddScoped<CurrenciesService>();
+
             services.AddControllers();
         }
 
