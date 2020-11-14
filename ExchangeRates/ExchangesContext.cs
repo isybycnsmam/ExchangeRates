@@ -8,6 +8,14 @@ namespace ExchangeRates
         public ExchangesContext(DbContextOptions<ExchangesContext> options)
             : base(options) { }
 
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<EuroExchange>(entity =>
+            {
+                entity.HasKey(c => new { c.Currency, c.Date });
+            });
+        }
+
         public DbSet<EuroExchange> EuroExchanges { get; set; }
     }
 }
