@@ -129,7 +129,7 @@ namespace ExchangeRates.Services
                     }
                     else
                     {
-                        yield return new CurrencyExchangeDTO(fromEuroRate, toEuroRate, startDate);
+                        yield return CurrencyExchangeDTO.Create(fromEuroRate, toEuroRate, startDate);
                     }
                 }
                 startDate = startDate.AddDays(1);
