@@ -6,28 +6,27 @@ using ExchangeRates.Models;
 namespace ExchangeRates.Interfaces
 {
     /// <summary>
-    /// Interface that defines methods for casching data
+    /// Interface that defines methods for caching euro exchanges data
     /// </summary>
-    public interface ICaschingEuroRatesService
+    public interface ICachingEuroExchangesService
     {
         /// <summary>
-        /// <para>Method that gets euro rates to given currencies for full time period</para>
+        /// <para>Method that gets euro exchanges to given currencies for full time period</para>
         /// </summary>
-        /// <param name="currencies">list of needed currencies</param>
+        /// <param name="currencyCodes">list of needed currencies</param>
         /// <param name="startDate">first correct datetime</param>
         /// <param name="endDate">last datetime</param>
         /// <returns>list of complete curriencies</returns>
         Task<IEnumerable<EuroExchange>> Get(
-            List<string> currencies,
+            List<string> currencyCodes,
             DateTime startDate,
             DateTime endDate);
 
         /// <summary>
-        /// 
+        /// Method that stores already downloaded euro exchanges
         /// </summary>
-        /// <param name="euroRates"></param>
-        /// <returns></returns>            
+        /// <param name="euroExchanges">euro exchanges that will be stored</param>
         Task Store(
-            IEnumerable<EuroExchange> euroRates);
+            IEnumerable<EuroExchange> euroExchanges);
     }
 }

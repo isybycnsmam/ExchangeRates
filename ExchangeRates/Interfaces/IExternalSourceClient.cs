@@ -8,17 +8,17 @@ namespace ExchangeRates.Interfaces
     /// <summary>
     /// Interface for communicating with external api
     /// </summary>
-    public interface IExternalApiClient
+    public interface IExternalSourceClient
 	{
 		/// <summary>
-        /// Method that gets curriencies exchanges with euro
+        /// Method that gets euro exchanges from external source
         /// </summary>
-        /// <param name="currencies">currencies codes list</param>
+        /// <param name="currenciesCodes">currencies codes list</param>
         /// <param name="dateFrom">start date</param>
         /// <param name="dateTo">end date</param>
-        /// <returns>List of currency exchanges for given currencies to euro</returns>
+        /// <returns>List of euro exchanges for given currencies</returns>
 		Task<IEnumerable<EuroExchange>> Get(
-            List<string> currencies,
+            List<string> currenciesCodes,
             DateTime dateFrom,
             DateTime dateTo);
 	}

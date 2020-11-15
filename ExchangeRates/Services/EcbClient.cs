@@ -1,5 +1,4 @@
-﻿using ExchangeRates.DTOs;
-using ExchangeRates.Interfaces;
+﻿using ExchangeRates.Interfaces;
 using ExchangeRates.Models;
 using System;
 using System.Collections.Generic;
@@ -13,13 +12,12 @@ namespace ExchangeRates.Services
     /// <para>Service for accessing ecb api</para>
     /// link: https://sdw-wsrest.ecb.europa.eu
     /// </summary>
-    public sealed class EcbClient : IExternalApiClient
+    public sealed class EcbClient : IExternalSourceClient
     {
         private const string URI_SCHEME = "https://sdw-wsrest.ecb.europa.eu/service/data/EXR/D.{0}.EUR.SP00.A?startPeriod={1}&endPeriod={2}&detail=dataonly";
         private const string CSV_HEADERS = "KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE";
         private readonly int CurrencyIndex, TimePeriodIndex, ObsValuevIndex;
 
-        // add encoding
         private readonly HttpClient _client;
 
         public EcbClient()
@@ -36,20 +34,20 @@ namespace ExchangeRates.Services
         }
 
         /// <summary>
-        /// Method that requests ecb api for exchange rates of given currencies to euro
+        /// Method that requests ecb api for euro exchange rates for given currencies
         /// </summary>
 		/// <inheritdoc />
         public async Task<IEnumerable<EuroExchange>> Get(
-            List<string> currencies,
+            List<string> currencyCodes,
             DateTime dateFrom,
             DateTime dateTo)
         {
             // create url (join needed countries together and append dates to base link) 
-            var currenciesStr = string.Join('+', currencies);
+            var currencyCodesStr = string.Join('+', currencyCodes);
             var url = string.Format(URI_SCHEME,
-                currenciesStr, // 0
-                dateFrom.ToString("yyyy-MM-dd"), // 1
-                dateTo.ToString("yyyy-MM-dd")); // 2
+                currencyCodesStr,
+                dateFrom.ToString("yyyy-MM-dd"),
+                dateTo.ToString("yyyy-MM-dd"));
 
             // request ecb api
             var responseString = await _client.GetStringAsync(url);
@@ -59,11 +57,11 @@ namespace ExchangeRates.Services
         }
 
         /// <summary>
-        /// <para>Method that parse csv string to IEnumerable of currency exchanges.</para>
-        /// If header (first line where are column definitions) is not exactly as CSV_HEADERS method returns empty array
+        /// <para>Method that parse csv string to IEnumerable of euro exchanges</para>
+        /// If header (first line where are column definitions) is not exactly as CSV_HEADERS method returns an empty array
         /// </summary>
-        /// <param name="source"></param>
-        /// <returns>IEnumerable of currency exchanges with euro</returns>
+        /// <param name="source">source string(csv)</param>
+        /// <returns>IEnumerable of euro exchanges</returns>
         private IEnumerable<EuroExchange> parseCsvData(string source)
         {
             var lines = source.Replace("\r", "").Split('\n');

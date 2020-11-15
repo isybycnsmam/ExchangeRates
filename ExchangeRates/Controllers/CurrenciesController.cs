@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace ExchangeRates.Controllers
 {
     [ApiController]
-    public class CurrenciesController : ControllerBase
+    public sealed class CurrenciesController : ControllerBase
     {
         private readonly ILogger _logger;
         private readonly CurrenciesService _currenciesService;
@@ -50,7 +50,7 @@ namespace ExchangeRates.Controllers
                 }
             }
 
-            var currencyExchanges = await _currenciesService.GetEchanges(currencyCodes.ToList(), startDate, endDate);
+            var currencyExchanges = await _currenciesService.GetExchanges(currencyCodes.ToList(), startDate, endDate);
 
             return Ok(currencyExchanges);
         }

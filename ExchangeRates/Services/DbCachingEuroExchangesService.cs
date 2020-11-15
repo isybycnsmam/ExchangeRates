@@ -10,42 +10,37 @@ using Microsoft.EntityFrameworkCore;
 namespace ExchangeRates.Services
 {
     /// <summary>
-    /// Service that implements ICaschingEuroRates by using in memory database
+    /// Service that implements ICachingEuroExchangesService by using database
     /// </summary>
-    public class InMemCaschingEuroRatesService : ICaschingEuroRatesService
+    public sealed class DbCachingEuroExchangesService : ICachingEuroExchangesService
     {
         private readonly ExchangesContext _exchangesContext;
 
-        public InMemCaschingEuroRatesService(
+        public DbCachingEuroExchangesService(
             ExchangesContext exchangesContext)
         {
             _exchangesContext = exchangesContext;
         }
 
-        /// <summary>
-        /// <para>Method that gets currencies from db that has complete info for time in between</para>
-        /// </summary>
-        /// <param name="currencies">list of needed currencies</param>
-        /// <param name="startDate">first correct datetime</param>
-        /// <param name="endDate">last datetime</param>
-        /// <returns>list of complete curriencies</returns>
+        /// <inheritdoc />
         public async Task<IEnumerable<EuroExchange>> Get(
-            List<string> currencies,
+            List<string> currencyCodes,
             DateTime startDate,
             DateTime endDate)
         {
-            // filter for expressing time in between
+            // filter for expressing time in between timeframe
             Expression<Func<EuroExchange, bool>> datePredicate =
                 e => e.Date >= startDate && e.Date <= endDate;
 
-            // get curriences codes that has complete information for given dates
+            // get curriences codes with counted days
             var currenciesWithCount = await _exchangesContext.EuroExchanges
                 .Where(datePredicate)
-                .Where(e => currencies.Contains(e.Currency))
+                .Where(e => currencyCodes.Contains(e.Currency))
                 .GroupBy(e => e.Currency)
                 .Select(e => new { Code = e.Key, Count = e.Count() })
                 .ToListAsync();
 
+            // filter only those that has complete information
             var daysBetween = getDaysBetween(startDate, endDate);
             var completeCurrencies = currenciesWithCount
                 .Where(e => e.Count == daysBetween)
@@ -60,21 +55,24 @@ namespace ExchangeRates.Services
             return exchangeRates;
         }
 
+        /// <inheritdoc />
         public async Task Store(
-            IEnumerable<EuroExchange> euroRates)
+            IEnumerable<EuroExchange> euroExchanges)
         {
-            var givenEuroRatesKeys = euroRates.Select(e => $"{e.Currency}:{e.Date}").ToList();
+            var givenEuroExchangesKeys = euroExchanges.Select(e => $"{e.Currency}:{e.Date}").ToList();
 
-            var existingEuroRates = await _exchangesContext.EuroExchanges
-                .Where(e => givenEuroRatesKeys.Contains($"{e.Currency}:{e.Date}"))
+            var existingEuroExchanges = await _exchangesContext.EuroExchanges
+                .Where(e => givenEuroExchangesKeys.Contains($"{e.Currency}:{e.Date}"))
                 .Select(e => $"{e.Currency}:{e.Date}")
                 .ToListAsync();
 
-            var nonExistingEuroRates = euroRates.Where(e => existingEuroRates.Contains($"{e.Currency}:{e.Date}") == false);
+            var nonExistingEuroExchanges = euroExchanges.Where(e => existingEuroExchanges.Contains($"{e.Currency}:{e.Date}") == false);
 
-            await _exchangesContext.EuroExchanges.AddRangeAsync(nonExistingEuroRates);
-
-            await _exchangesContext.SaveChangesAsync();
+            if (nonExistingEuroExchanges.Count() > 0)
+            {
+                await _exchangesContext.EuroExchanges.AddRangeAsync(nonExistingEuroExchanges);
+                await _exchangesContext.SaveChangesAsync();
+            }
         }
 
         /// <summary>

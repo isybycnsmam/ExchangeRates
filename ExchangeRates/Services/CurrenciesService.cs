@@ -12,40 +12,39 @@ namespace ExchangeRates.Services
     /// <summary>
     /// Service for getting and casching exchange rates 
     /// </summary>
-    /// <inheritdoc />
     public sealed class CurrenciesService
     {
         private readonly ILogger _logger;
-        private readonly IExternalApiClient _externalApiClient;
-        private readonly ICaschingEuroRatesService _caschingEuroRatesService;
+        private readonly IExternalSourceClient _externalApiClient;
+        private readonly ICachingEuroExchangesService _cachingEuroRatesService;
 
         public CurrenciesService(
             ILogger<CurrenciesService> logger,
-            IExternalApiClient externalApiClient,
-            ICaschingEuroRatesService caschingEuroRatesService,
+            IExternalSourceClient externalApiClient,
+            ICachingEuroExchangesService cachingEuroRatesService,
             ExchangesContext exchangesContext)
         {
             _logger = logger;
             _externalApiClient = externalApiClient;
-            _caschingEuroRatesService = caschingEuroRatesService;
+            _cachingEuroRatesService = cachingEuroRatesService;
         }
 
 
         /// <summary>
-        /// Method that gets all rates from memory or from external sources(saves it for later) 
-        /// and then builds exchanges based on rates 
+        /// Method that gets all rates from memory or from external sources(next saves them for later) 
+        /// and then builds currency exchanges based on rates 
         /// </summary>
-        /// <param name="currencyExchangeCodes">requested codes to be exchanged</param>
+        /// <param name="currencyCodes">requested codes to be exchanged</param>
         /// <param name="startDate">first day</param>
         /// <param name="endDate">last day</param>
-        /// <returns>generated List of CurrencyExchange</returns>
-        public async Task<List<CurrencyExchange>> GetEchanges(
-            List<KeyValuePair<string, string>> currencyExchangeCodes,
+        /// <returns>generated List of CurrencyExchanges</returns>
+        public async Task<List<CurrencyExchangeDTO>> GetExchanges(
+            List<KeyValuePair<string, string>> currencyCodes,
             DateTime startDate,
             DateTime endDate)
         {
             // get all nessesary currencies
-            var nessessaryCurrencies = currencyExchangeCodes
+            var nessessaryCurrencies = currencyCodes
                 .SelectMany(e => new string[] { e.Key, e.Value })
                 .Distinct()
                 .Where(e => e != "EUR")
@@ -58,7 +57,7 @@ namespace ExchangeRates.Services
             var euroRates = new List<EuroExchange>() { new EuroExchange() { Currency = "EUR", ExchangeRate = 1 } };
 
             // add stored exchanges
-            euroRates.AddRange(await _caschingEuroRatesService.Get(nessessaryCurrencies, fixedDate, endDate));
+            euroRates.AddRange(await _cachingEuroRatesService.Get(nessessaryCurrencies, fixedDate, endDate));
 
             // remove all known curriencies from those that needs to by downloaded
             nessessaryCurrencies.RemoveAll(currency => euroRates.Any(e => e.Currency == currency));
@@ -69,22 +68,22 @@ namespace ExchangeRates.Services
                 var downloadedRates = await _externalApiClient.Get(nessessaryCurrencies, fixedDate, endDate);
                 euroRates.AddRange(downloadedRates);
                 // save none existing rates
-                _ = Task.Run(() => _caschingEuroRatesService.Store(downloadedRates));
+                await _cachingEuroRatesService.Store(downloadedRates);
             }
 
-            return generateCurrencyExchanges(currencyExchangeCodes, euroRates, startDate, endDate).ToList();
+            return generateCurrencyExchanges(currencyCodes, euroRates, startDate, endDate).ToList();
         }
 
         /// <summary>
-        /// Method that generates currency exchanges from exchange codes list and euro rates
+        /// Method that generates currency exchanges from currency codes list and euro rates
         /// </summary>
-        /// <param name="currencyExchangeCodes">requested codes to be exchanged</param>
+        /// <param name="currencyCodes">requested codes to be exchanged</param>
         /// <param name="euroRates">euro rates to all currencies</param>
         /// <param name="startDate">first day</param>
         /// <param name="endDate">last day</param>
         /// <returns>generated IEnumerable of CurrencyExchanges</returns>
-        private IEnumerable<CurrencyExchange> generateCurrencyExchanges(
-            List<KeyValuePair<string, string>> currencyExchangeCodes,
+        private IEnumerable<CurrencyExchangeDTO> generateCurrencyExchanges(
+            List<KeyValuePair<string, string>> currencyCodes,
             List<EuroExchange> euroRates,
             DateTime startDate,
             DateTime endDate)
@@ -113,7 +112,7 @@ namespace ExchangeRates.Services
                     continue;// ignore this data :/
                 }
 
-                foreach (var exchangeCodes in currencyExchangeCodes)
+                foreach (var exchangeCodes in currencyCodes)
                 {
                     var fromEuroRate = getRate(currencyDate.Value, exchangeCodes.Key);
                     var toEuroRate = getRate(currencyDate.Value, exchangeCodes.Value);
@@ -124,7 +123,7 @@ namespace ExchangeRates.Services
                     }
                     else
                     {
-                        yield return new CurrencyExchange(fromEuroRate, toEuroRate, startDate);
+                        yield return new CurrencyExchangeDTO(fromEuroRate, toEuroRate, startDate);
                     }
                 }
 
@@ -133,12 +132,12 @@ namespace ExchangeRates.Services
         }
 
         /// <summary>
-        /// <para>Method that gets first day from past that is not weekend day</para>
-        /// and optionally substracts date by a specyci number of working days
+        /// <para>Method that gets first day from the past that is not weekend day or current if its working day</para>
+        /// and optionally substracts date by a specyfic number of working days
         /// </summary>
         /// <param name="date">source date</param>
-        /// <param name="daysToSubtract">source date</param>
-        /// <returns>date time from past or source date</returns>
+        /// <param name="workingDaysToSubtract">working days to substract</param>
+        /// <returns>date time from the past or source date</returns>
         private DateTime getFixedDate(DateTime date, int workingDaysToSubtract = 0)
         {
             var weekendDays = new[] { DayOfWeek.Saturday, DayOfWeek.Sunday };

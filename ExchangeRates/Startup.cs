@@ -18,22 +18,20 @@ namespace ExchangeRates
 
         public IConfiguration Configuration { get; }
 
-        // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddDbContext<ExchangesContext>(options =>
             	options.UseInMemoryDatabase("Exchanges"));
 
-			services.AddSingleton<IExternalApiClient, EcbClient>();
+			services.AddSingleton<IExternalSourceClient, EcbClient>();
 
-			services.AddScoped<ICaschingEuroRatesService, InMemCaschingEuroRatesService>();
+			services.AddScoped<ICachingEuroExchangesService, DbCachingEuroExchangesService>();
 
 			services.AddScoped<CurrenciesService>();
 
             services.AddControllers();
         }
 
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
