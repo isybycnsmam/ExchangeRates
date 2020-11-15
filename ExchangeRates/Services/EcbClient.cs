@@ -49,11 +49,18 @@ namespace ExchangeRates.Services
                 dateFrom.ToString("yyyy-MM-dd"),
                 dateTo.ToString("yyyy-MM-dd"));
 
-            // request ecb api
-            var responseString = await _client.GetStringAsync(url);
+            try
+            {
+                // request ecb api
+                var responseString = await _client.GetStringAsync(url);
 
-            // convert data
-            return parseCsvData(responseString).ToList();
+                // convert data
+                return parseCsvData(responseString).ToList();
+            }
+            catch
+            {
+                return new List<EuroExchange>();
+            }
         }
 
         /// <summary>
