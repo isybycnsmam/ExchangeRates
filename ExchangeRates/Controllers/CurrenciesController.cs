@@ -36,6 +36,8 @@ namespace ExchangeRates.Controllers
             [FromQuery, BindRequired] DateTime endDate,
             [FromQuery, BindRequired] string apiKey)
         {
+            _logger.LogInformation("/get requested");
+
             if (await _apiKeyService.IsValid(apiKey) == false)
             {
                 return StatusCode(403, "Invalid api key");

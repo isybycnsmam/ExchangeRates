@@ -22,6 +22,8 @@ namespace ExchangeRates.Controllers
         [HttpGet("/generate")]
         public async Task<IActionResult> Index()
         {
+            _logger.LogInformation("/generate requested");
+
 			var apiKey = await _apiKeyService.Generate();
             return Ok(apiKey);
         }
