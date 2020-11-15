@@ -16,6 +16,7 @@ namespace ExchangeRates
             });
         }
 
+        public DbSet<ApiKey> ApiKeys { get; set; }
         public DbSet<EuroExchange> EuroExchanges { get; set; }
         public DbSet<BankingHoliday> BankingHolidays { get; set; }
     }

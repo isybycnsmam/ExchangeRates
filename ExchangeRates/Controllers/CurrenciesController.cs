@@ -1,4 +1,5 @@
-﻿using ExchangeRates.Services;
+﻿using ExchangeRates.Interfaces;
+using ExchangeRates.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.Logging;
@@ -14,15 +15,18 @@ namespace ExchangeRates.Controllers
     public sealed class CurrenciesController : ControllerBase
     {
         private readonly ILogger _logger;
+        private readonly IApiKeyService _apiKeyService;
         private readonly CurrenciesService _currenciesService;
         private const string CURRENCY_CODE_REGEX = @"^[A-Z]{3}$";
 
         public CurrenciesController(
             ILogger<CurrenciesController> logger,
+            IApiKeyService apiKeyService,
             CurrenciesService currenciesService)
         {
             _logger = logger;
             _currenciesService = currenciesService;
+            _apiKeyService = apiKeyService;
         }
 
         [HttpGet("/get")]
@@ -32,9 +36,13 @@ namespace ExchangeRates.Controllers
             [FromQuery, BindRequired] DateTime endDate,
             [FromQuery, BindRequired] string apiKey)
         {
-            if (startDate > DateTime.Now)
+            if (await _apiKeyService.IsValid(apiKey) == false)
             {
-                return NotFound();
+                return StatusCode(403, "Invalid api key");
+            }
+            else if (startDate > DateTime.Now)
+            {
+                return NotFound("Start date is form future");
             }
             else if (startDate > endDate)
             {

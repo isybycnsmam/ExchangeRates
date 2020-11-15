@@ -23,9 +23,11 @@ namespace ExchangeRates
             services.AddDbContext<ExchangesContext>(options =>
             	options.UseInMemoryDatabase("Exchanges"));
 
-			services.AddSingleton<IExternalSourceClient, EcbClient>();
+			services.AddScoped<IApiKeyService, ApiKeyService>();
 
 			services.AddScoped<IDataCachingService, DbDataCachingService>();
+
+			services.AddSingleton<IExternalSourceClient, EcbClient>();
 
 			services.AddScoped<CurrenciesService>();
 

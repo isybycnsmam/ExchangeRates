@@ -1,20 +1,29 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Threading.Tasks;
+using ExchangeRates.Interfaces;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
 namespace ExchangeRates.Controllers
 {
-	public class TokenController : Controller
-	{
-		private readonly ILogger _logger;
+    [ApiController]
+    public class TokenController : ControllerBase
+    {
+        private readonly ILogger _logger;
+        private readonly IApiKeyService _apiKeyService;
 
-		public TokenController(ILogger<TokenController> logger)
-		{
-			_logger = logger;
-		}
+        public TokenController(
+            ILogger<TokenController> logger,
+            IApiKeyService apiKeyService)
+        {
+            _logger = logger;
+            _apiKeyService = apiKeyService;
+        }
 
-		public IActionResult Index()
-		{
-			return Ok();
-		}
-	}
+        [HttpGet("/generate")]
+        public async Task<IActionResult> Index()
+        {
+			var apiKey = await _apiKeyService.Generate();
+            return Ok(apiKey);
+        }
+    }
 }
