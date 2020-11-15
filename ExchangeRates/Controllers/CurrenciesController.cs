@@ -38,7 +38,7 @@ namespace ExchangeRates.Controllers
             }
             else if (startDate > endDate)
             {
-                return BadRequest("startDate is greater than endDate");
+                return BadRequest("Start date is greater than End date");
             }
 
             foreach (var codesPair in currencyCodes)
