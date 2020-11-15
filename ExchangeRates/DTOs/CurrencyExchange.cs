@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.Json.Serialization;
 using ExchangeRates.Models;
 
 namespace ExchangeRates.DTOs
@@ -21,13 +22,17 @@ namespace ExchangeRates.DTOs
         {
             CurrencyFrom = from.Currency;
             CurrencyTo = to.Currency;
-            Date = date;
-            ExchangeRate = Math.Round(1 / from.ExchangeRate * to.ExchangeRate, 4);
+            Date = date.ToString("yyyy-MM-dd");
+            ExchangeRate = Math.Round(1 / to.ExchangeRate * from.ExchangeRate, 4);
         }
-
-        public DateTime Date { get; set; }
+        
+        [JsonPropertyName("date")]
+        public string Date { get; set; }
+        [JsonPropertyName("from")]
         public string CurrencyFrom { get; set; }
+        [JsonPropertyName("to")]
         public string CurrencyTo { get; set; }
+        [JsonPropertyName("rate")]
         public double ExchangeRate { get; set; }
     }
 }
