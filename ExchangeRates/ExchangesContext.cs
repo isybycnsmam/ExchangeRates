@@ -17,5 +17,6 @@ namespace ExchangeRates
         }
 
         public DbSet<EuroExchange> EuroExchanges { get; set; }
+        public DbSet<BankingHoliday> BankingHolidays { get; set; }
     }
 }

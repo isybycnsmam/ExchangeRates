@@ -8,7 +8,7 @@ namespace ExchangeRates.Interfaces
     /// <summary>
     /// Interface that defines methods for caching euro exchanges data
     /// </summary>
-    public interface ICachingEuroExchangesService
+    public interface IDataCachingService
     {
         /// <summary>
         /// <para>Method that gets euro exchanges to given currencies for full time period</para>
@@ -26,7 +26,14 @@ namespace ExchangeRates.Interfaces
         /// Method that stores already downloaded euro exchanges
         /// </summary>
         /// <param name="euroExchanges">euro exchanges that will be stored</param>
-        Task Store(
+        Task StoreEuroExchanges(
             IEnumerable<EuroExchange> euroExchanges);
+
+        /// <summary>
+        /// Method that stores occurs of banking holidays
+        /// </summary>
+        /// <param name="bankingHolidays">banking holidays that will be stored</param>
+        void StoreBankingHolidays(
+            List<BankingHoliday> bankingHolidays);
     }
 }

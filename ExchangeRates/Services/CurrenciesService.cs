@@ -16,17 +16,17 @@ namespace ExchangeRates.Services
     {
         private readonly ILogger _logger;
         private readonly IExternalSourceClient _externalApiClient;
-        private readonly ICachingEuroExchangesService _cachingEuroRatesService;
+        private readonly IDataCachingService _dataCachingService;
 
         public CurrenciesService(
             ILogger<CurrenciesService> logger,
             IExternalSourceClient externalApiClient,
-            ICachingEuroExchangesService cachingEuroRatesService,
+            IDataCachingService dataCachingService,
             ExchangesContext exchangesContext)
         {
             _logger = logger;
             _externalApiClient = externalApiClient;
-            _cachingEuroRatesService = cachingEuroRatesService;
+            _dataCachingService = dataCachingService;
         }
 
 
@@ -57,7 +57,7 @@ namespace ExchangeRates.Services
             var euroRates = new List<EuroExchange>() { new EuroExchange() { Currency = "EUR", ExchangeRate = 1 } };
 
             // add stored exchanges
-            euroRates.AddRange(await _cachingEuroRatesService.Get(nessessaryCurrencies, fixedDate, endDate));
+            euroRates.AddRange(await _dataCachingService.Get(nessessaryCurrencies, fixedDate, endDate));
 
             // remove all known curriencies from those that needs to by downloaded
             nessessaryCurrencies.RemoveAll(currency => euroRates.Any(e => e.Currency == currency));
@@ -68,7 +68,7 @@ namespace ExchangeRates.Services
                 var downloadedRates = await _externalApiClient.Get(nessessaryCurrencies, fixedDate, endDate);
                 euroRates.AddRange(downloadedRates);
                 // save none existing rates
-                await _cachingEuroRatesService.Store(downloadedRates);
+                await _dataCachingService.StoreEuroExchanges(downloadedRates);
             }
 
             return generateCurrencyExchanges(currencyCodes, euroRates, startDate, endDate).ToList();
@@ -95,6 +95,7 @@ namespace ExchangeRates.Services
                         euroRate.Currency == code &&
                         (euroRate.Date == date || code == "EUR"));
 
+            var publicBankingHolidays = new List<BankingHoliday>();
 
             // generate currency-currency exchange rates
             while (startDate <= endDate)
@@ -106,10 +107,15 @@ namespace ExchangeRates.Services
                     .OrderByDescending(e => e.Date)
                     .FirstOrDefault()?.Date;
 
+                if (startDate == fixedDate && startDate > currencyDate)
+                {
+                    publicBankingHolidays.Add(new BankingHoliday(startDate));
+                }
+
                 if (currencyDate is null)
                 {
                     _logger.LogWarning($"Data not found for date: {startDate}");
-                    continue;// ignore this data :/
+                    continue;// ignore this date :/
                 }
 
                 foreach (var exchangeCodes in currencyCodes)
@@ -126,9 +132,10 @@ namespace ExchangeRates.Services
                         yield return new CurrencyExchangeDTO(fromEuroRate, toEuroRate, startDate);
                     }
                 }
-
                 startDate = startDate.AddDays(1);
             }
+
+            _dataCachingService.StoreBankingHolidays(publicBankingHolidays);
         }
 
         /// <summary>

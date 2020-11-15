@@ -25,7 +25,7 @@ namespace ExchangeRates
 
 			services.AddSingleton<IExternalSourceClient, EcbClient>();
 
-			services.AddScoped<ICachingEuroExchangesService, DbCachingEuroExchangesService>();
+			services.AddScoped<IDataCachingService, DbDataCachingService>();
 
 			services.AddScoped<CurrenciesService>();
 

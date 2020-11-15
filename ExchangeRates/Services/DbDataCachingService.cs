@@ -10,13 +10,13 @@ using Microsoft.EntityFrameworkCore;
 namespace ExchangeRates.Services
 {
     /// <summary>
-    /// Service that implements ICachingEuroExchangesService by using database
+    /// Service that implements IDataCachingService by using database
     /// </summary>
-    public sealed class DbCachingEuroExchangesService : ICachingEuroExchangesService
+    public sealed class DbDataCachingService : IDataCachingService
     {
         private readonly ExchangesContext _exchangesContext;
 
-        public DbCachingEuroExchangesService(
+        public DbDataCachingService(
             ExchangesContext exchangesContext)
         {
             _exchangesContext = exchangesContext;
@@ -41,7 +41,7 @@ namespace ExchangeRates.Services
                 .ToListAsync();
 
             // filter only those that has complete information
-            var daysBetween = getDaysBetween(startDate, endDate);
+            var daysBetween = await getDaysBetween(startDate, endDate);
             var completeCurrencies = currenciesWithCount
                 .Where(e => e.Count == daysBetween)
                 .Select(e => e.Code);
@@ -56,7 +56,8 @@ namespace ExchangeRates.Services
         }
 
         /// <inheritdoc />
-        public async Task Store(
+        public async Task StoreEuroExchanges(
+            //add date filer
             IEnumerable<EuroExchange> euroExchanges)
         {
             var givenEuroExchangesKeys = euroExchanges.Select(e => $"{e.Currency}:{e.Date}").ToList();
@@ -74,20 +75,58 @@ namespace ExchangeRates.Services
                 await _exchangesContext.SaveChangesAsync();
             }
         }
+                
+        /// <inheritdoc />
+        public void StoreBankingHolidays(
+            List<BankingHoliday> bankingHolidays)
+        {
+            if (bankingHolidays.Count < 1)
+            {
+                return;
+            }
+
+            // get first and last date
+            DateTime? firstDate = bankingHolidays.FirstOrDefault()?.Date,
+                    lastDate = bankingHolidays.LastOrDefault()?.Date;
+
+            if (firstDate != null && lastDate != null)
+            {
+                var existingHolidays = _exchangesContext.BankingHolidays
+                    .Where(e => e.Date >= firstDate && e.Date <= lastDate)
+                    .Select(e => e.Date)
+                    .ToList();
+
+                var holidaysToAdd = bankingHolidays
+                    .Where(e => existingHolidays.Contains(e.Date) == false)
+                    .ToList();
+
+                if (holidaysToAdd.Count > 0)
+                {
+                    _exchangesContext.BankingHolidays.AddRange(holidaysToAdd);
+                    _exchangesContext.SaveChanges();
+                }
+            }
+        }
 
         /// <summary>
-        /// Method that gets number of days(except weekend days) between two dates
+        /// Method that gets number of days(except weekend days and public banking holidays) between two dates
         /// </summary>
         /// <param name="startDate">first day date</param>
         /// <param name="endDate">last day date</param>
         /// <returns>int that is numbers of days beetween given dates</returns>
-        private int getDaysBetween(DateTime startDate, DateTime endDate)
+        private async Task<int> getDaysBetween(DateTime startDate, DateTime endDate)
         {
             var weekendDays = new[] { DayOfWeek.Saturday, DayOfWeek.Sunday };
+            var bankingHolidays = await _exchangesContext.BankingHolidays
+                .Where(e => e.Date >= startDate && e.Date <= endDate)
+                .Select(e => e.Date)
+                .ToListAsync();
+
             var daysCount = 0;
             while (startDate <= endDate)
             {
-                if (weekendDays.Contains(startDate.DayOfWeek) == false)
+                if (weekendDays.Contains(startDate.DayOfWeek) == false &&
+                    bankingHolidays.Contains(startDate) == false)
                 {
                     daysCount++;
                 }
