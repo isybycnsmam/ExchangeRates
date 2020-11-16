@@ -43,6 +43,9 @@ namespace ExchangeRates.Services
             DateTime startDate,
             DateTime endDate)
         {
+            // get 3 days from the past to avoid missing days
+            var fixedNeededDate = substractWorkingDaysFromDate(startDate, 3);
+
             // get all nessesary currencies
             var nessessaryCurrencies = currencyCodes
                 .SelectMany(e => new string[] { e.Key, e.Value })
@@ -50,11 +53,25 @@ namespace ExchangeRates.Services
                 .Where(e => e != "EUR")
                 .ToList();
 
-            // get 3 days from the past to avoid missing days
-            var fixedDate = substractWorkingDaysFromDate(startDate, 3);
+            var neededEuroExchanges = await getNeededEuroExchangesPerDay(nessessaryCurrencies, fixedNeededDate, endDate);
 
+            return generateCurrencyExchanges(currencyCodes, neededEuroExchanges, startDate, endDate).ToList();
+        }
+
+        /// <summary>
+        /// Method that gets euro exchanges and then if some is not downloaded saves them for later
+        /// </summary>
+        /// <param name="nessessaryCurrencies">needed codes</param>
+        /// <param name="fixedNeededDate">first euro exchange date</param>
+        /// <param name="endDate">last euro exchange date</param>
+        /// <returns>Dictionary of dates and list of euro exchanges for this day</returns>
+        private async Task<Dictionary<DateTime, List<EuroExchange>>> getNeededEuroExchangesPerDay(
+            List<string> nessessaryCurrencies,
+            DateTime fixedNeededDate,
+            DateTime endDate)
+        {
             // add stored exchanges
-            var euroRates = new List<EuroExchange>(await _dataCachingService.Get(nessessaryCurrencies, fixedDate, endDate));
+            var euroRates = await _dataCachingService.GetExchanges(nessessaryCurrencies, fixedNeededDate, endDate);
 
             // remove all known curriencies from those that needs to by downloaded
             nessessaryCurrencies.RemoveAll(currency => euroRates.Any(e => e.Currency == currency));
@@ -62,26 +79,31 @@ namespace ExchangeRates.Services
             // add new exchanges and save them
             if (nessessaryCurrencies.Count > 0)
             {
-                var downloadedRates = await _externalApiClient.Get(nessessaryCurrencies, fixedDate, endDate);
-                euroRates.AddRange(downloadedRates);
-                // save none existing rates
-                await _dataCachingService.StoreEuroExchanges(downloadedRates);
+                var downloadedEuroExchanges = await _externalApiClient.GetExchanges(nessessaryCurrencies, fixedNeededDate, endDate);
+                await _dataCachingService.StoreEuroExchanges(downloadedEuroExchanges);
+                euroRates = euroRates.Concat(downloadedEuroExchanges);
             }
 
-            return generateCurrencyExchanges(currencyCodes, euroRates, startDate, endDate).ToList();
+            // group exchanges by date
+            var avaliableCurrenciesPerDay = euroRates
+                .GroupBy(e => e.Date)
+                //.Select(e => new KeyValuePair<DateTime, List<EuroExchange>>(e.Key, e.ToList()))
+                .ToDictionary(e => e.Key, e => e.ToList());
+
+            return avaliableCurrenciesPerDay;
         }
 
         /// <summary>
         /// Method that generates currency exchanges from currency codes list and euro rates
         /// </summary>
         /// <param name="currencyCodes">requested codes to be exchanged</param>
-        /// <param name="euroRates">euro rates to all currencies</param>
+        /// <param name="euroExchangesPerDay">euro exchanges  to all currencies</param>
         /// <param name="startDate">first day</param>
         /// <param name="endDate">last day</param>
         /// <returns>generated IEnumerable of CurrencyExchanges</returns>
         private IEnumerable<CurrencyExchangeDTO> generateCurrencyExchanges(
             List<KeyValuePair<string, string>> currencyCodes,
-            List<EuroExchange> euroRates,
+            Dictionary<DateTime, List<EuroExchange>> euroExchangesPerDay,
             DateTime startDate,
             DateTime endDate)
         {
@@ -89,60 +111,56 @@ namespace ExchangeRates.Services
             var euro = new EuroExchange() { Currency = "EUR", ExchangeRate = 1 };
 
             // get date of first usefull element in given euroexchanges
-            var firstCurrencyDate = euroRates
-                .Where(e => e.Date <= startDate)
-                .Select(e => e.Date)
+            var firstCurrencyDate = euroExchangesPerDay
+                .Where(e => e.Key <= startDate)
+                .Select(e => e.Key)
                 .LastOrDefault();
 
-            // get dates thats nessesary to generate exchanges
-            var avaliableCurrenciesPerDay = euroRates
-                .Where(e => e.Date >= firstCurrencyDate)
-                .GroupBy(e => e.Date)
-                .Select(e => new KeyValuePair<DateTime, List<EuroExchange>>(e.Key, e.ToList()));
-
             // get enumerators
-            var currentEnumerator = avaliableCurrenciesPerDay.GetEnumerator();
-            var nextEnumerator = avaliableCurrenciesPerDay.Skip(1).GetEnumerator();
+            var currentEnumerator = euroExchangesPerDay.GetEnumerator();
+            var nextEnumerator = euroExchangesPerDay.Skip(1).GetEnumerator();
+            var canMoveToNext = true;
 
-            // get enumerators and set them for initial locations
-            currentEnumerator.MoveNext();
-            var canMoveToNext = nextEnumerator.MoveNext();
-
-            // holidays to be stored
-            var bankingHolidaysList = new List<BankingHoliday>();
+            var bankingHolidays = new List<BankingHoliday>();
 
             // generate currency-currency exchange rates
-            while (startDate <= endDate)
+            var currentDay = substractWorkingDaysFromDate(startDate, 3);
+            while (currentDay <= endDate)
             {
-                foreach (var codePair in currencyCodes)
-                {
-                    var fromEuroRate = codePair.Key == "EUR" ? euro : currentEnumerator.Current.Value?.FirstOrDefault(e => e.Currency == codePair.Key);
-                    var toEuroRate = codePair.Value == "EUR" ? euro : currentEnumerator.Current.Value?.FirstOrDefault(e => e.Currency == codePair.Value);
-
-                    if (fromEuroRate != null && toEuroRate != null)
-                    {
-                        yield return CurrencyExchangeDTO.Create(fromEuroRate, toEuroRate, startDate);
-                    }
-                }
-
                 // check if next enumerator cover next day
-                if (canMoveToNext && startDate.AddDays(1) >= nextEnumerator.Current.Key)
+                if (canMoveToNext && currentDay >= nextEnumerator.Current.Key)
                 {
                     currentEnumerator.MoveNext();
                     canMoveToNext = nextEnumerator.MoveNext();
                 }
-                else if (startDate.DayOfWeek != DayOfWeek.Saturday &&
-                        startDate.DayOfWeek != DayOfWeek.Sunday &&
-                        startDate <= endDate &&
-                        startDate != DateTime.Now.Date)
+
+                if (currentDay != currentEnumerator.Current.Key &&
+                    currentDay.DayOfWeek != DayOfWeek.Saturday &&
+                    currentDay.DayOfWeek != DayOfWeek.Sunday &&
+                    currentDay.Date < DateTime.Now)
                 {
-                    bankingHolidaysList.Add(new BankingHoliday(startDate));
+                    bankingHolidays.Add(new BankingHoliday(currentDay));
                 }
 
-                startDate = startDate.AddDays(1);
+                if (currentDay >= startDate)
+                {
+
+                    foreach (var codePair in currencyCodes)
+                    {
+                        var fromEuroRate = codePair.Key == "EUR" ? euro : currentEnumerator.Current.Value?.FirstOrDefault(e => e.Currency == codePair.Key);
+                        var toEuroRate = codePair.Value == "EUR" ? euro : currentEnumerator.Current.Value?.FirstOrDefault(e => e.Currency == codePair.Value);
+
+                        if (fromEuroRate != null && toEuroRate != null)
+                        {
+                            yield return CurrencyExchangeDTO.Create(fromEuroRate, toEuroRate, currentDay);
+                        }
+                    }
+                }
+
+                currentDay = currentDay.AddDays(1);
             }
 
-            _dataCachingService.StoreBankingHolidays(bankingHolidaysList);
+            _dataCachingService.StoreBankingHolidays(bankingHolidays);
         }
 
         /// <summary>

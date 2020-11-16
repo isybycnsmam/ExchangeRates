@@ -37,7 +37,7 @@ namespace ExchangeRates.Services
         /// Method that requests ecb api for euro exchange rates for given currencies
         /// </summary>
 		/// <inheritdoc />
-        public async Task<IEnumerable<EuroExchange>> Get(
+        public async Task<IEnumerable<EuroExchange>> GetExchanges(
             List<string> currencyCodes,
             DateTime dateFrom,
             DateTime dateTo)

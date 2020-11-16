@@ -17,7 +17,7 @@ namespace ExchangeRates.Interfaces
         /// <param name="startDate">first correct datetime</param>
         /// <param name="endDate">last datetime</param>
         /// <returns>list of complete curriencies</returns>
-        Task<IEnumerable<EuroExchange>> Get(
+        Task<IEnumerable<EuroExchange>> GetExchanges(
             List<string> currencyCodes,
             DateTime startDate,
             DateTime endDate);

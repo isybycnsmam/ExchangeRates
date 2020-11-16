@@ -23,7 +23,7 @@ namespace ExchangeRates.Services
         }
 
         /// <inheritdoc />
-        public async Task<IEnumerable<EuroExchange>> Get(
+        public async Task<IEnumerable<EuroExchange>> GetExchanges(
             List<string> currencyCodes,
             DateTime startDate,
             DateTime endDate)
@@ -57,7 +57,6 @@ namespace ExchangeRates.Services
 
         /// <inheritdoc />
         public async Task StoreEuroExchanges(
-            //add date filer
             IEnumerable<EuroExchange> euroExchanges)
         {
             var givenEuroExchangesKeys = euroExchanges.Select(e => $"{e.Currency}:{e.Date}").ToList();
@@ -67,7 +66,7 @@ namespace ExchangeRates.Services
                 .Select(e => $"{e.Currency}:{e.Date}")
                 .ToListAsync();
 
-            var nonExistingEuroExchanges = euroExchanges.Where(e => existingEuroExchanges.Contains($"{e.Currency}:{e.Date}") == false);
+            var nonExistingEuroExchanges = euroExchanges.Where(e => existingEuroExchanges.Contains($"{e.Currency}:{e.Date}") == false).ToList();
 
             if (nonExistingEuroExchanges.Count() > 0)
             {
@@ -75,7 +74,7 @@ namespace ExchangeRates.Services
                 await _exchangesContext.SaveChangesAsync();
             }
         }
-                
+
         /// <inheritdoc />
         public void StoreBankingHolidays(
             List<BankingHoliday> bankingHolidays)
