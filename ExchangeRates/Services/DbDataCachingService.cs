@@ -115,7 +115,11 @@ namespace ExchangeRates.Services
         /// <returns>int that is numbers of days beetween given dates</returns>
         private async Task<int> getDaysBetween(DateTime startDate, DateTime endDate)
         {
-            var weekendDays = new[] { DayOfWeek.Saturday, DayOfWeek.Sunday };
+            if (startDate == DateTime.Now.Date && DateTime.UtcNow.Hour + 1 < 16)
+            {
+                startDate = startDate.AddDays(-1);
+            }
+
             var bankingHolidays = await _exchangesContext.BankingHolidays
                 .Where(e => e.Date >= startDate && e.Date <= endDate)
                 .Select(e => e.Date)
@@ -124,7 +128,8 @@ namespace ExchangeRates.Services
             var daysCount = 0;
             while (startDate <= endDate)
             {
-                if (weekendDays.Contains(startDate.DayOfWeek) == false &&
+                if (startDate.DayOfWeek != DayOfWeek.Saturday &&
+                    startDate.DayOfWeek != DayOfWeek.Sunday &&
                     bankingHolidays.Contains(startDate) == false)
                 {
                     daysCount++;

@@ -21,8 +21,7 @@ namespace ExchangeRates.Services
         public CurrenciesService(
             ILogger<CurrenciesService> logger,
             IExternalSourceClient externalApiClient,
-            IDataCachingService dataCachingService,
-            ExchangesContext exchangesContext)
+            IDataCachingService dataCachingService)
         {
             _logger = logger;
             _externalApiClient = externalApiClient;
