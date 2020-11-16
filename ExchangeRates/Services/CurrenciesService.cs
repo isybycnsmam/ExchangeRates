@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using ExchangeRates.DTOs;
@@ -49,19 +50,16 @@ namespace ExchangeRates.Services
                 .Distinct()
                 .Where(e => e != "EUR")
                 .ToList();
-
+                
             // get 3 days from the past to avoid missing days
-            var fixedDate = getFixedDate(startDate, 3);
-
-            // create rates and add eur record
-            var euroRates = new List<EuroExchange>() { new EuroExchange() { Currency = "EUR", ExchangeRate = 1 } };
+            var fixedDate = substractWorkingDaysFromDate(startDate, 3);
 
             // add stored exchanges
-            euroRates.AddRange(await _dataCachingService.Get(nessessaryCurrencies, fixedDate, endDate));
+            var euroRates = new List<EuroExchange>(await _dataCachingService.Get(nessessaryCurrencies, fixedDate, endDate));
 
             // remove all known curriencies from those that needs to by downloaded
             nessessaryCurrencies.RemoveAll(currency => euroRates.Any(e => e.Currency == currency));
-
+            
             // add new exchanges and save them
             if (nessessaryCurrencies.Count > 0)
             {
@@ -70,7 +68,7 @@ namespace ExchangeRates.Services
                 // save none existing rates
                 await _dataCachingService.StoreEuroExchanges(downloadedRates);
             }
-
+            
             return generateCurrencyExchanges(currencyCodes, euroRates, startDate, endDate).ToList();
         }
 
@@ -88,64 +86,71 @@ namespace ExchangeRates.Services
             DateTime startDate,
             DateTime endDate)
         {
-            // filter for easy getting exact rate from euroRates list
-            Func<DateTime, string, EuroExchange> getRate =
-                (date, code) =>
-                    euroRates.FirstOrDefault(euroRate =>
-                        euroRate.Currency == code &&
-                        (euroRate.Date == date || code == "EUR"));
+            // set euro
+            var euro = new EuroExchange() { Currency = "EUR", ExchangeRate = 1 };
 
-            var publicBankingHolidays = new List<BankingHoliday>();
+            // get date of first usefull element in given euroexchanges
+            var firstCurrencyDate = euroRates
+                .Where(e => e.Date <= startDate)
+                .Select(e => e.Date)
+                .LastOrDefault();
+
+            // get dates thats nessesary to generate exchanges
+            var avaliableCurrenciesPerDay = euroRates
+                .Where(e => e.Date >= firstCurrencyDate)
+                .GroupBy(e => e.Date)
+                .Select(e => new KeyValuePair<DateTime, List<EuroExchange>>(e.Key, e.ToList()));
+
+            // get enumerators
+            var currentEnumerator = avaliableCurrenciesPerDay.GetEnumerator();
+            var nextEnumerator = avaliableCurrenciesPerDay.Skip(1).GetEnumerator();
+
+            // get enumerators and set them for initial locations
+            currentEnumerator.MoveNext();
+            var canMoveToNext = nextEnumerator.MoveNext();
+
+            // holidays to be stored
+            var bankingHolidaysList = new List<BankingHoliday>();
 
             // generate currency-currency exchange rates
             while (startDate <= endDate)
             {
-                var fixedDate = getFixedDate(startDate);
-                var currencyDate = euroRates
-                    .Skip(1)// ignore euro line
-                    .Where(e => e.Date <= fixedDate)
-                    .OrderByDescending(e => e.Date)
-                    .FirstOrDefault()?.Date;
-
-                if (startDate == fixedDate && startDate > currencyDate)
+                foreach (var codePair in currencyCodes)
                 {
-                    publicBankingHolidays.Add(new BankingHoliday(startDate));
-                }
+                    var fromEuroRate = codePair.Key == "EUR" ? euro : currentEnumerator.Current.Value?.FirstOrDefault(e => e.Currency == codePair.Key);
+                    var toEuroRate = codePair.Value == "EUR" ? euro : currentEnumerator.Current.Value?.FirstOrDefault(e => e.Currency == codePair.Value);
 
-                if (currencyDate is null)
-                {
-                    _logger.LogWarning($"Data not found for date: {startDate}");
-                    continue;// ignore this date :/
-                }
-
-                foreach (var exchangeCodes in currencyCodes)
-                {
-                    var fromEuroRate = getRate(currencyDate.Value, exchangeCodes.Key);
-                    var toEuroRate = getRate(currencyDate.Value, exchangeCodes.Value);
-
-                    if (fromEuroRate is null || toEuroRate is null)
-                    {
-                        _logger.LogWarning($"Not found {exchangeCodes.Key} or {exchangeCodes.Value} currency rates for day {startDate}");
-                    }
-                    else
+                    if (fromEuroRate != null && toEuroRate != null)
                     {
                         yield return CurrencyExchangeDTO.Create(fromEuroRate, toEuroRate, startDate);
                     }
                 }
+
+                // add 1 day and check if next enumerator cover its date
                 startDate = startDate.AddDays(1);
+                if (canMoveToNext && startDate >= nextEnumerator.Current.Key)
+                {
+                    currentEnumerator.MoveNext();
+                    canMoveToNext = nextEnumerator.MoveNext();
+                }
+                else if (startDate.DayOfWeek != DayOfWeek.Saturday &&
+                        startDate.DayOfWeek != DayOfWeek.Sunday &&
+                        startDate <= endDate)
+                {
+                    bankingHolidaysList.Add(new BankingHoliday(startDate));
+                }
             }
 
-            _dataCachingService.StoreBankingHolidays(publicBankingHolidays);
+            _dataCachingService.StoreBankingHolidays(bankingHolidaysList);
         }
 
         /// <summary>
-        /// <para>Method that gets first day from the past that is not weekend day or current if its working day</para>
-        /// and optionally substracts date by a specyfic number of working days
+        /// Method that substract date by given count of working days
         /// </summary>
         /// <param name="date">source date</param>
         /// <param name="workingDaysToSubtract">working days to substract</param>
-        /// <returns>date time from the past or source date</returns>
-        private DateTime getFixedDate(DateTime date, int workingDaysToSubtract = 0)
+        /// <returns>date time from the past</returns>
+        private DateTime substractWorkingDaysFromDate(DateTime date, int workingDaysToSubtract)
         {
             var weekendDays = new[] { DayOfWeek.Saturday, DayOfWeek.Sunday };
 

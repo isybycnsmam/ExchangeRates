@@ -76,7 +76,8 @@ namespace ExchangeRates.Services
             }
             return Convert.ToBase64String(key)
                 .Replace('+', '_')
-                .Replace('=', '-');
+                .Replace('=', '-')
+                .Replace('/', '.');
         }
     }
 }
