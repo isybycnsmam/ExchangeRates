@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using ExchangeRates.DTOs;
@@ -50,7 +49,7 @@ namespace ExchangeRates.Services
                 .Distinct()
                 .Where(e => e != "EUR")
                 .ToList();
-                
+
             // get 3 days from the past to avoid missing days
             var fixedDate = substractWorkingDaysFromDate(startDate, 3);
 
@@ -59,7 +58,7 @@ namespace ExchangeRates.Services
 
             // remove all known curriencies from those that needs to by downloaded
             nessessaryCurrencies.RemoveAll(currency => euroRates.Any(e => e.Currency == currency));
-            
+
             // add new exchanges and save them
             if (nessessaryCurrencies.Count > 0)
             {
@@ -68,7 +67,7 @@ namespace ExchangeRates.Services
                 // save none existing rates
                 await _dataCachingService.StoreEuroExchanges(downloadedRates);
             }
-            
+
             return generateCurrencyExchanges(currencyCodes, euroRates, startDate, endDate).ToList();
         }
 
@@ -126,19 +125,21 @@ namespace ExchangeRates.Services
                     }
                 }
 
-                // add 1 day and check if next enumerator cover its date
-                startDate = startDate.AddDays(1);
-                if (canMoveToNext && startDate >= nextEnumerator.Current.Key)
+                // check if next enumerator cover next day
+                if (canMoveToNext && startDate.AddDays(1) >= nextEnumerator.Current.Key)
                 {
                     currentEnumerator.MoveNext();
                     canMoveToNext = nextEnumerator.MoveNext();
                 }
                 else if (startDate.DayOfWeek != DayOfWeek.Saturday &&
                         startDate.DayOfWeek != DayOfWeek.Sunday &&
-                        startDate <= endDate)
+                        startDate <= endDate &&
+                        startDate != DateTime.Now.Date)
                 {
                     bankingHolidaysList.Add(new BankingHoliday(startDate));
                 }
+
+                startDate = startDate.AddDays(1);
             }
 
             _dataCachingService.StoreBankingHolidays(bankingHolidaysList);
