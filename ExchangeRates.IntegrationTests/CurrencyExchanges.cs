@@ -164,7 +164,7 @@ namespace ExchangeRates.IntegrationTests
 		}
 
 		[Fact]
-		public async Task Get_CurrencyExchanges_ForEurToUsd_TwoMonths()
+		public async Task Get_CurrencyExchanges_ForEurToUsd_OneMonth()
 		{
 			//Arrange
 			var currencyCodes = new Dictionary<string, string>()
