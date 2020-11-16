@@ -29,13 +29,9 @@ namespace ExchangeRates.DTOs
 			};
 		}
 
-		[JsonPropertyName("date")]
 		public string Date { get; set; }
-		[JsonPropertyName("from")]
 		public string CurrencyFrom { get; set; }
-		[JsonPropertyName("to")]
 		public string CurrencyTo { get; set; }
-		[JsonPropertyName("rate")]
 		public double ExchangeRate { get; set; }
 	}
 }
