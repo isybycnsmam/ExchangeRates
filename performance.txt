@@ -1,0 +1,4 @@
+zapytania których nie ma w cahe (tzn nigdy jeszcze nie zostały zażądane) to czas od 400ms do 600ms(dużo zależy od tego w ile odpowie api ecb)
+zapytania zapisane w cache od  5ms do 20ms w przypadku pobierania danych z przedziału do 1 miesiąca
+w przypadku pobierania np 20 lat czas pobierania danych z cache wynosi od 30-100 ms
+w przypadku kiedy w wymienie uczestniczą waluty i część jest w cache a częśćnie to zostaną dociągnięte tylko te których nie ma
